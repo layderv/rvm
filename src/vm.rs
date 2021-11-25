@@ -5,6 +5,7 @@ pub struct VM {
     pc: usize,
     program: Vec<u8>,
     remainder: u32,
+    bool_flag: bool, // equality flag
 }
 
 impl VM {
@@ -14,6 +15,7 @@ impl VM {
             pc: 0,
             program: vec![],
             remainder: 0,
+            bool_flag: false,
         }
     }
 
@@ -78,6 +80,54 @@ impl VM {
                 let t = self.regs[self.next_8b_reg() as usize];
                 self.pc = self.pc.wrapping_add(t as usize);
             }
+            Opcode::EQ => {
+                let a = self.regs[self.next_8b_reg() as usize];
+                let b = self.regs[self.next_8b_reg() as usize];
+                self.bool_flag = a == b;
+                self.discard_8b(); // discard 8b
+            }
+            Opcode::NEQ => {
+                let a = self.regs[self.next_8b_reg() as usize];
+                let b = self.regs[self.next_8b_reg() as usize];
+                self.bool_flag = a != b;
+                self.discard_8b(); // discard 8b
+            }
+            Opcode::GT => {
+                let a = self.regs[self.next_8b_reg() as usize];
+                let b = self.regs[self.next_8b_reg() as usize];
+                self.bool_flag = a > b;
+                self.discard_8b(); // discard 8b
+            }
+            Opcode::GEQ => {
+                let a = self.regs[self.next_8b_reg() as usize];
+                let b = self.regs[self.next_8b_reg() as usize];
+                self.bool_flag = a >= b;
+                self.discard_8b(); // discard 8b
+            }
+            Opcode::LT => {
+                let a = self.regs[self.next_8b_reg() as usize];
+                let b = self.regs[self.next_8b_reg() as usize];
+                self.bool_flag = a < b;
+                self.discard_8b(); // discard 8b
+            }
+            Opcode::LEQ => {
+                let a = self.regs[self.next_8b_reg() as usize];
+                let b = self.regs[self.next_8b_reg() as usize];
+                self.bool_flag = a <= b;
+                self.discard_8b(); // discard 8b
+            }
+            Opcode::JEQ => {
+                let t = self.regs[self.next_8b_reg() as usize];
+                if self.bool_flag {
+                    self.pc = t as usize;
+                }
+            }
+            Opcode::JNE => {
+                let t = self.regs[self.next_8b_reg() as usize];
+                if !self.bool_flag {
+                    self.pc = t as usize;
+                }
+            }
             op => {
                 println!("Unrecognized opcode: {:?}", op);
                 return true;
@@ -91,6 +141,10 @@ impl VM {
         println!("decoding byte: {:?}", self.program[self.pc]);
         self.pc += 1;
         return op;
+    }
+
+    fn discard_8b(&mut self) {
+        self.pc += 1;
     }
 
     fn next_8b(&mut self) -> u8 {
@@ -257,6 +311,114 @@ mod tests {
         let mut vm = VM::new();
         vm.regs[1] = 3;
         vm.program = vec![Opcode::JMPF as u8, 1, 255, 255, Opcode::HLT as u8];
+        vm.step();
+        assert_eq!(vm.pc, 5);
+    }
+    #[test]
+    fn test_opcode_eq() {
+        let mut vm = VM::new();
+        vm.regs[0] = 1;
+        vm.regs[1] = 1;
+        vm.program = vec![Opcode::EQ as u8, 0, 1];
+        vm.step();
+        assert_eq!(vm.bool_flag, true);
+        vm.pc = 0;
+        vm.regs[0] = 0;
+        vm.step();
+        assert_eq!(vm.bool_flag, false);
+    }
+    #[test]
+    fn test_opcode_neq() {
+        let mut vm = VM::new();
+        vm.regs[0] = 1;
+        vm.regs[1] = 1;
+        vm.program = vec![Opcode::NEQ as u8, 0, 1];
+        vm.step();
+        assert_eq!(vm.bool_flag, false);
+        vm.pc = 0;
+        vm.regs[0] = 0;
+        vm.step();
+        assert_eq!(vm.bool_flag, true);
+    }
+    #[test]
+    fn test_opcode_gt() {
+        let mut vm = VM::new();
+        vm.regs[0] = 1;
+        vm.regs[1] = 1;
+        vm.program = vec![Opcode::GT as u8, 0, 1];
+        vm.step();
+        assert_eq!(vm.bool_flag, false);
+        vm.pc = 0;
+        vm.regs[0] = 5;
+        vm.step();
+        assert_eq!(vm.bool_flag, true);
+    }
+    #[test]
+    fn test_opcode_lt() {
+        let mut vm = VM::new();
+        vm.regs[0] = 1;
+        vm.regs[1] = 1;
+        vm.program = vec![Opcode::LT as u8, 0, 1];
+        vm.step();
+        assert_eq!(vm.bool_flag, false);
+        vm.pc = 0;
+        vm.regs[1] = 2;
+        vm.step();
+        assert_eq!(vm.bool_flag, true);
+    }
+    #[test]
+    fn test_opcode_geq() {
+        let mut vm = VM::new();
+        vm.regs[0] = 1;
+        vm.regs[1] = 1;
+        vm.program = vec![Opcode::GEQ as u8, 0, 1];
+        vm.step();
+        assert_eq!(vm.bool_flag, true);
+        vm.pc = 0;
+        vm.regs[0] = 0;
+        vm.step();
+        assert_eq!(vm.bool_flag, false);
+    }
+    #[test]
+    fn test_opcode_leq() {
+        let mut vm = VM::new();
+        vm.regs[0] = 1;
+        vm.regs[1] = 1;
+        vm.program = vec![Opcode::LEQ as u8, 0, 1];
+        vm.step();
+        assert_eq!(vm.bool_flag, true);
+        vm.pc = 0;
+        vm.regs[0] = 0;
+        vm.step();
+        assert_eq!(vm.bool_flag, true);
+    }
+    #[test]
+    fn test_opcode_jeq() {
+        let mut vm = VM::new();
+        vm.bool_flag = true;
+        vm.regs[0] = 5;
+        vm.program = vec![Opcode::JEQ as u8, 0, 255, 255, 255, Opcode::HLT as u8];
+        vm.step();
+        assert_eq!(vm.pc, 5);
+        vm.pc = 0;
+        vm.bool_flag = false;
+        vm.regs[0] = 5;
+        vm.program = vec![Opcode::JEQ as u8, 0, 255, 255, 255, Opcode::HLT as u8];
+        vm.step();
+        assert_eq!(vm.pc, 2);
+    }
+    #[test]
+    fn test_opcode_jne() {
+        let mut vm = VM::new();
+        vm.bool_flag = true;
+        vm.regs[0] = 5;
+        vm.program = vec![Opcode::JNE as u8, 0, 255, 255, 255, Opcode::HLT as u8];
+        vm.step();
+        assert_eq!(vm.pc, 2);
+        vm.pc = 0;
+        vm.bool_flag = false;
+        vm.regs[0] = 5;
+        vm.program = vec![Opcode::JNE as u8, 0, 255, 255, 255, Opcode::HLT as u8];
         vm.step();
         assert_eq!(vm.pc, 5);
     }
