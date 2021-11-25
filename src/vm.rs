@@ -29,6 +29,7 @@ impl VM {
             return true;
         }
         match self.decode_opcode() {
+            Opcode::NOP => {}
             Opcode::HLT => {
                 println!("HLTing");
                 return true;
@@ -58,6 +59,24 @@ impl VM {
                 let q = self.regs[self.next_8b_reg() as usize];
                 self.regs[self.next_8b_reg() as usize] = p / q;
                 self.remainder = (p % q) as u32;
+            }
+            Opcode::JMP => {
+                let t = self.regs[self.next_8b_reg() as usize];
+                self.pc = t as usize;
+            }
+            Opcode::JMPB => {
+                let t = self.regs[self.next_8b_reg() as usize];
+                println!(
+                    "t={:?} oldpc={:?} newpc={:?}",
+                    t,
+                    self.pc,
+                    self.pc.wrapping_sub(t as usize)
+                );
+                self.pc = self.pc.wrapping_sub(t as usize);
+            }
+            Opcode::JMPF => {
+                let t = self.regs[self.next_8b_reg() as usize];
+                self.pc = self.pc.wrapping_add(t as usize);
             }
             op => {
                 println!("Unrecognized opcode: {:?}", op);
@@ -215,5 +234,30 @@ mod tests {
         vm.run();
         assert_eq!(vm.regs[2], 1);
         assert_eq!(vm.remainder, 1);
+    }
+    #[test]
+    fn test_opcode_jmp() {
+        let mut vm = VM::new();
+        vm.regs[1] = 5;
+        vm.program = vec![Opcode::JMP as u8, 1, 255, 255, 255, Opcode::HLT as u8];
+        vm.step();
+        assert_eq!(vm.pc, 5);
+    }
+    #[test]
+    fn test_opcode_jmpb() {
+        let mut vm = VM::new();
+        vm.regs[1] = 3;
+        vm.pc = 1;
+        vm.program = vec![Opcode::HLT as u8, Opcode::JMPB as u8, 1, 255, 255, 255];
+        vm.run();
+        assert_eq!(vm.pc, 1); // stop after executing hlt
+    }
+    #[test]
+    fn test_opcode_jmpf() {
+        let mut vm = VM::new();
+        vm.regs[1] = 3;
+        vm.program = vec![Opcode::JMPF as u8, 1, 255, 255, Opcode::HLT as u8];
+        vm.step();
+        assert_eq!(vm.pc, 5);
     }
 }
