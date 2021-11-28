@@ -29,6 +29,9 @@ impl AssemblerInstruction {
                 None => {}
             }
         }
+        while res.len() < 4 {
+            res.push(0); // padding
+        }
         return res;
     }
 
