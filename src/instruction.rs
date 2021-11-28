@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Opcode {
     NOP = 0,
@@ -24,6 +26,38 @@ pub enum Opcode {
 #[derive(Debug, PartialEq)]
 pub struct Instruction {
     opcode: Opcode,
+}
+
+impl fmt::Display for Opcode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl From<&str> for Opcode {
+    fn from(v: &str) -> Self {
+        match v.to_lowercase().as_str() {
+            "nop" => Opcode::NOP,
+            "hlt" => Opcode::HLT,
+            "load" => Opcode::LOAD,
+            "add" => Opcode::ADD,
+            "sub" => Opcode::SUB,
+            "mul" => Opcode::MUL,
+            "div" => Opcode::DIV,
+            "jmp" => Opcode::JMP,
+            "jmpb" => Opcode::JMPB,
+            "jmpf" => Opcode::JMPF,
+            "eq" => Opcode::EQ,
+            "neq" => Opcode::NEQ,
+            "gt" => Opcode::GT,
+            "lt" => Opcode::LT,
+            "geq" => Opcode::GEQ,
+            "leq" => Opcode::LEQ,
+            "jeq" => Opcode::JEQ,
+            "jne" => Opcode::JNE,
+            _ => Opcode::IGL,
+        }
+    }
 }
 
 impl Instruction {

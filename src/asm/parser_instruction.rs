@@ -1,8 +1,4 @@
-use nom::{
-    character::complete::{multispace0, multispace1},
-    sequence::tuple,
-    IResult,
-};
+use nom::{branch::alt, character::complete::multispace0, sequence::tuple, IResult};
 
 use crate::asm::parser_op::*;
 use crate::asm::parser_operand::integer_operand;
@@ -54,11 +50,42 @@ impl AssemblerInstruction {
     }
 }
 
+pub fn instruction_zero(input: &str) -> IResult<&str, AssemblerInstruction> {
+    let input = input.trim();
+    let (input, (o, _)) = tuple((opcode, multispace0))(input)?;
+    Ok((
+        input,
+        AssemblerInstruction {
+            opcode: o,
+            operand1: None,
+            operand2: None,
+            operand3: None,
+        },
+    ))
+}
 pub fn instruction_one(input: &str) -> IResult<&str, AssemblerInstruction> {
     let input = input.trim();
+    let (input, (o, _, operand, _)) = tuple((
+        opcode,
+        multispace0,
+        alt((register, integer_operand)), /* TODO improve this */
+        multispace0,
+    ))(input)?;
+    Ok((
+        input,
+        AssemblerInstruction {
+            opcode: o,
+            operand1: Some(operand),
+            operand2: None,
+            operand3: None,
+        },
+    ))
+}
+pub fn instruction_two(input: &str) -> IResult<&str, AssemblerInstruction> {
+    let input = input.trim();
     let (input, (o, _, r, _, i, _)) = tuple((
-        opcode_load,
-        multispace1,
+        opcode,
+        multispace0,
         register,
         multispace0,
         integer_operand,
@@ -74,15 +101,45 @@ pub fn instruction_one(input: &str) -> IResult<&str, AssemblerInstruction> {
         },
     ))
 }
+pub fn instruction_three(input: &str) -> IResult<&str, AssemblerInstruction> {
+    let input = input.trim();
+    let (input, (o, _, r, _, i, _, i2, _)) = tuple((
+        opcode,
+        multispace0,
+        register,
+        multispace0,
+        integer_operand,
+        multispace0,
+        integer_operand,
+        multispace0,
+    ))(input)?;
+    Ok((
+        input,
+        AssemblerInstruction {
+            opcode: o,
+            operand1: Some(r),
+            operand2: Some(i),
+            operand3: Some(i2),
+        },
+    ))
+}
+pub fn instruction(input: &str) -> IResult<&str, AssemblerInstruction> {
+    alt((
+        instruction_three,
+        instruction_two,
+        instruction_one,
+        instruction_zero,
+    ))(input)
+}
 
 mod tests {
     use super::*;
     use crate::instruction::Opcode;
 
     #[test]
-    fn test_parse_instruction_one() {
+    fn test_parse_instruction_two() {
         assert_eq!(
-            instruction_one("load  $0     #100 \n"),
+            instruction_two("load  $0     #100 \n"),
             Ok((
                 "",
                 AssemblerInstruction {

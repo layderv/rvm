@@ -15,8 +15,9 @@ impl Program {
         return prog;
     }
 }
+
 pub fn program(input: &str) -> IResult<&str, Program> {
-    let (input, is) = many1(instruction_one)(input)?;
+    let (input, is) = many1(instruction)(input)?;
     Ok((input, Program { instructions: is }))
 }
 

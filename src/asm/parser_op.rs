@@ -1,21 +1,33 @@
 use crate::asm::Token;
 use crate::instruction::Opcode;
-use nom::{bytes::complete::tag, IResult};
+use nom::{
+    bytes::complete::tag, character::complete::alpha1, character::complete::space0,
+    sequence::terminated, IResult,
+};
 
-pub fn opcode_load(input: &str) -> IResult<&str, Token> {
-    let (input, _) = tag("load")(input)?;
-    Ok((input, Token::Op { code: Opcode::LOAD }))
+pub fn opcode(input: &str) -> IResult<&str, Token> {
+    let (input, chars) = terminated(alpha1, space0)(input)?;
+    println!("-----{}-{}", input, chars);
+    Ok((
+        input,
+        Token::Op {
+            code: Opcode::from(chars),
+        },
+    ))
 }
 
 mod tests {
     use super::*;
     #[test]
-    fn test_opcode_load() {
-        let r = opcode_load("load");
+    fn test_opcode() {
+        let r = opcode("load");
         assert_eq!(r.is_ok(), true);
         let (r, token) = r.unwrap();
         assert_eq!(token, Token::Op { code: Opcode::LOAD });
         assert_eq!(r, "");
-        assert_eq!(opcode_load("invalid").is_ok(), false);
+        assert_eq!(
+            opcode("invalid").unwrap().1,
+            Token::Op { code: Opcode::IGL }
+        );
     }
 }
