@@ -64,6 +64,14 @@ impl VM {
                 self.regs[self.next_8b_reg() as usize] = p / q;
                 self.remainder = (p % q) as u32;
             }
+            Opcode::INC => {
+                let r = self.next_8b_reg() as usize;
+                self.regs[r] = self.regs[r].wrapping_add(1);
+            }
+            Opcode::DEC => {
+                let r = self.next_8b_reg() as usize;
+                self.regs[r] = self.regs[r].wrapping_sub(1);
+            }
             Opcode::JMP => {
                 let t = self.regs[self.next_8b_reg() as usize];
                 self.pc = t as usize;
