@@ -36,10 +36,12 @@ mod tests {
                 "",
                 Program {
                     instructions: vec![AssemblerInstruction {
-                        opcode: Token::Op { code: Opcode::LOAD },
+                        opcode: Some(Token::Op { code: Opcode::LOAD }),
                         operand1: Some(Token::Reg { reg: 0 }),
                         operand2: Some(Token::IntegerOperand { i: 0 }),
-                        operand3: None
+                        operand3: None,
+                        directive: None,
+                        label: None,
                     }]
                 }
             ))
@@ -51,16 +53,20 @@ mod tests {
                 Program {
                     instructions: vec![
                         AssemblerInstruction {
-                            opcode: Token::Op { code: Opcode::LOAD },
+                            opcode: Some(Token::Op { code: Opcode::LOAD }),
                             operand1: Some(Token::Reg { reg: 0 }),
                             operand2: Some(Token::IntegerOperand { i: 0 }),
-                            operand3: None
+                            operand3: None,
+                            directive: None,
+                            label: None,
                         },
                         AssemblerInstruction {
-                            opcode: Token::Op { code: Opcode::LOAD },
+                            opcode: Some(Token::Op { code: Opcode::LOAD }),
                             operand1: Some(Token::Reg { reg: 1 }),
                             operand2: Some(Token::IntegerOperand { i: 100 }),
-                            operand3: None
+                            operand3: None,
+                            directive: None,
+                            label: None,
                         }
                     ]
                 }

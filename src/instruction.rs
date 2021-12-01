@@ -75,8 +75,9 @@ impl Instruction {
 impl From<u8> for Opcode {
     fn from(v: u8) -> Self {
         match v {
-            x if x == Opcode::HLT as u8 => return Opcode::HLT,
-            x if x == Opcode::LOAD as u8 => return Opcode::LOAD,
+            x if x == Opcode::NOP as u8 => Opcode::NOP,
+            x if x == Opcode::HLT as u8 => Opcode::HLT,
+            x if x == Opcode::LOAD as u8 => Opcode::LOAD,
             x if x == Opcode::ADD as u8 => Opcode::ADD,
             x if x == Opcode::SUB as u8 => Opcode::SUB,
             x if x == Opcode::MUL as u8 => Opcode::MUL,
@@ -95,7 +96,7 @@ impl From<u8> for Opcode {
             x if x == Opcode::JEQ as u8 => Opcode::JEQ,
             x if x == Opcode::JNE as u8 => Opcode::JNE,
             x if x == Opcode::ALOC as u8 => Opcode::ALOC,
-            _ => return Opcode::IGL,
+            _ => Opcode::IGL,
         }
     }
 }

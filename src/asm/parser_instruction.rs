@@ -1,13 +1,20 @@
-use nom::{branch::alt, character::complete::multispace0, sequence::tuple, IResult};
+use nom::{
+    branch::alt, character::complete::multispace0, character::complete::space0, combinator::opt,
+    sequence::tuple, IResult,
+};
 
+use crate::asm::parser_directive::*;
+use crate::asm::parser_label::{label_declaration, label_usage};
 use crate::asm::parser_op::*;
-use crate::asm::parser_operand::integer_operand;
+use crate::asm::parser_operand::{integer_operand, operand};
 use crate::asm::parser_reg::register;
 use crate::asm::Token;
 
 #[derive(Debug, PartialEq)]
 pub struct AssemblerInstruction {
-    pub opcode: Token,
+    pub directive: Option<Token>,
+    pub label: Option<Token>,
+    pub opcode: Option<Token>,
     pub operand1: Option<Token>,
     pub operand2: Option<Token>,
     pub operand3: Option<Token>,
@@ -17,7 +24,7 @@ impl AssemblerInstruction {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut res = vec![];
         match self.opcode {
-            Token::Op { code } => res.push(code as u8),
+            Some(Token::Op { code }) => res.push(code as u8),
             _ => {
                 println!("Non-opcode found in opcode field");
                 std::process::exit(1)
@@ -59,10 +66,12 @@ pub fn instruction_zero(input: &str) -> IResult<&str, AssemblerInstruction> {
     Ok((
         input,
         AssemblerInstruction {
-            opcode: o,
+            opcode: Some(o),
             operand1: None,
             operand2: None,
             operand3: None,
+            label: None,
+            directive: None,
         },
     ))
 }
@@ -77,10 +86,12 @@ pub fn instruction_one(input: &str) -> IResult<&str, AssemblerInstruction> {
     Ok((
         input,
         AssemblerInstruction {
-            opcode: o,
+            opcode: Some(o),
             operand1: Some(operand),
             operand2: None,
             operand3: None,
+            label: None,
+            directive: None,
         },
     ))
 }
@@ -97,10 +108,12 @@ pub fn instruction_two(input: &str) -> IResult<&str, AssemblerInstruction> {
     Ok((
         input,
         AssemblerInstruction {
-            opcode: o,
+            opcode: Some(o),
             operand1: Some(r),
             operand2: Some(i),
             operand3: None,
+            label: None,
+            directive: None,
         },
     ))
 }
@@ -119,20 +132,57 @@ pub fn instruction_three(input: &str) -> IResult<&str, AssemblerInstruction> {
     Ok((
         input,
         AssemblerInstruction {
-            opcode: o,
+            opcode: Some(o),
             operand1: Some(r),
             operand2: Some(i),
             operand3: Some(i2),
+            label: None,
+            directive: None,
         },
     ))
 }
 pub fn instruction(input: &str) -> IResult<&str, AssemblerInstruction> {
     alt((
+        instruction_all,
         instruction_three,
         instruction_two,
         instruction_one,
         instruction_zero,
+        directive,
     ))(input)
+}
+pub fn instruction_all(input: &str) -> IResult<&str, AssemblerInstruction> {
+    let (input, (label, _, opcode, _, operand1, _, operand2, _, operand3, _)) = tuple((
+        opt(label_declaration),
+        space0,
+        opcode,
+        space0,
+        opt(operand),
+        space0,
+        opt(operand),
+        space0,
+        opt(operand),
+        space0,
+    ))(input)?;
+
+    let label = if let Some(Token::LabelDeclaration { name: label }) = label {
+        Some(Token::LabelDeclaration {
+            name: label.to_string(),
+        })
+    } else {
+        None
+    };
+    Ok((
+        input,
+        AssemblerInstruction {
+            opcode: Some(opcode),
+            label,
+            directive: None,
+            operand1,
+            operand2,
+            operand3,
+        },
+    ))
 }
 
 mod tests {
@@ -146,10 +196,12 @@ mod tests {
             Ok((
                 "",
                 AssemblerInstruction {
-                    opcode: Token::Op { code: Opcode::LOAD },
+                    opcode: Some(Token::Op { code: Opcode::LOAD }),
                     operand1: Some(Token::Reg { reg: 0 }),
                     operand2: Some(Token::IntegerOperand { i: 100 }),
                     operand3: None,
+                    label: None,
+                    directive: None,
                 }
             ))
         )

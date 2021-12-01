@@ -35,7 +35,7 @@ impl VM {
         match self.decode_opcode() {
             Opcode::NOP => {}
             Opcode::HLT => {
-                println!("HLTing");
+                println!("Halting");
                 return true;
             }
             Opcode::LOAD => {
@@ -153,7 +153,6 @@ impl VM {
 
     fn decode_opcode(&mut self) -> Opcode {
         let op = Opcode::from(self.program[self.pc]);
-        println!("decoding byte: {:?}", self.program[self.pc]);
         self.pc += 1;
         return op;
     }

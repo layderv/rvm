@@ -1,8 +1,9 @@
 use nom::{
-    bytes::complete::tag, character::complete::digit1, character::complete::multispace0,
-    sequence::terminated, IResult,
+    branch::alt, bytes::complete::tag, character::complete::digit1,
+    character::complete::multispace0, sequence::terminated, IResult,
 };
 
+use crate::asm::parser_reg::register;
 use crate::asm::Token;
 
 /* recognize: #n where n is i32 with 0+ spaces around */
@@ -16,6 +17,10 @@ pub fn integer_operand(input: &str) -> IResult<&str, Token> {
             i: i.parse::<i32>().unwrap(),
         },
     ))
+}
+
+pub fn operand(input: &str) -> IResult<&str, Token> {
+    alt((integer_operand, register))(input)
 }
 
 mod tests {

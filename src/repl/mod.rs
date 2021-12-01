@@ -1,3 +1,4 @@
+use crate::asm::parser_program::*;
 use crate::vm;
 use std;
 use std::io;
@@ -42,9 +43,11 @@ impl REPL {
                         ".registers",
                         ".history",
                         ".program",
-                        ".instruct",
+                        ".instruct BYTES",
                         ".run",
                         ".step",
+                        ".clear_program",
+                        ".load_file FILE",
                     ] {
                         println!("\t{}", cmd);
                     }
@@ -64,8 +67,17 @@ impl REPL {
                 ".registers" => {
                     println!("Registers:");
                     for (i, reg) in self.vm.regs.iter().enumerate() {
-                        println!("reg{}: {}", i, reg);
+                        print!("reg{:02}: {}\t", i, reg);
+                        if i > 0 && (i % 4) == 3 {
+                            println!()
+                        }
                     }
+                    println!();
+                    println!(
+                        "remainder:{}\nflag:{}",
+                        self.vm.remainder, self.vm.bool_flag
+                    );
+                    println!("pc:{}", self.vm.pc);
                 }
                 ".instruct" => match self.parse_hex(&args.join(" ")) {
                     Ok(mut bytes) => self.vm.program.append(&mut bytes),
@@ -79,8 +91,30 @@ impl REPL {
                     self.vm.run();
                     ()
                 }
+                ".clear_program" => self.vm.program.clear(),
+                ".load_file" => {
+                    if args.len() == 0 {
+                        println!("No filename specified");
+                        continue;
+                    }
+                    println!("Loading {}", args[0]);
+                    match std::fs::read(args[0]) {
+                        Ok(data) => match program(std::str::from_utf8(&data).unwrap()) {
+                            Ok((_rest, prog)) => {
+                                self.vm.program.append(&mut prog.to_bytes());
+                                println!("Parsed.");
+                            }
+                            Err(e) => {
+                                println!("Cannot parse file, {}", e);
+                            }
+                        },
+                        Err(e) => {
+                            println!("Error reading the file: {}", e);
+                        }
+                    }
+                }
                 _ => {
-                    println!("invalid input")
+                    println!("Invalid input. Try the .help command")
                 }
             }
             self.cmd.push(input.to_string());

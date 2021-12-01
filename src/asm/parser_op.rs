@@ -1,13 +1,11 @@
 use crate::asm::Token;
 use crate::instruction::Opcode;
 use nom::{
-    bytes::complete::tag, character::complete::alpha1, character::complete::space0,
-    sequence::terminated, IResult,
+    character::complete::alpha1, character::complete::space0, sequence::terminated, IResult,
 };
 
 pub fn opcode(input: &str) -> IResult<&str, Token> {
     let (input, chars) = terminated(alpha1, space0)(input)?;
-    println!("-----{}-{}", input, chars);
     Ok((
         input,
         Token::Op {
