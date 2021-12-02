@@ -9,6 +9,9 @@ pub mod parser_reg;
 
 use crate::asm::parser_program::{program, Program};
 
+pub const PIE_HEADER_PREFIX: [u8; 4] = [0x7e, 'P' as u8, 'I' as u8, 'E' as u8];
+pub const PIE_HEADER_LENGTH: usize = 64;
+
 #[derive(Debug, PartialEq)]
 pub enum Token {
     Op { code: Opcode },
@@ -59,8 +62,11 @@ impl Assembler {
     pub fn assemble(&mut self, raw: &str) -> Option<Vec<u8>> {
         match program(raw) {
             Ok((_rest, prog)) => {
+                let mut program = self.write_pie_header();
                 self.process_first_phase(&prog);
-                Some(self.process_second_phase(&prog))
+                let mut body = self.process_second_phase(&prog);
+                program.append(&mut body);
+                Some(program)
             }
             Err(e) => {
                 println!("Error assembling: {}", e);
@@ -97,6 +103,15 @@ impl Assembler {
                 None => {}
             }
         }
+    }
+
+    fn write_pie_header(&self) -> Vec<u8> {
+        let mut header: Vec<u8> = vec![];
+        PIE_HEADER_PREFIX.iter().for_each(|b| header.push(*b));
+        (header.len()..PIE_HEADER_LENGTH)
+            .into_iter()
+            .for_each(|_| header.push(0u8));
+        header
     }
 }
 
@@ -145,7 +160,7 @@ mod tests {
         let code = "load $0 #100\nload $1 #99\nlab:inc $0\njmp @test\nhlt";
         let program: Vec<u8> = asm.assemble(code).unwrap();
         assert_eq!(
-            program,
+            program[PIE_HEADER_LENGTH..], // TODO check header
             vec![
                 Opcode::LOAD as u8,
                 0,

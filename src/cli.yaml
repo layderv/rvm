@@ -1,0 +1,7 @@
+name: rvm
+version: "0"
+args:
+  - INPUT_FILE:
+      help: Path to the source code to parse
+      required: false
+      index: 1

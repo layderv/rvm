@@ -94,37 +94,37 @@ impl VM {
                 let a = self.regs[self.next_8b_reg() as usize];
                 let b = self.regs[self.next_8b_reg() as usize];
                 self.bool_flag = a == b;
-                self.discard_8b(); // discard 8b
+                self.discard_8b();
             }
             Opcode::NEQ => {
                 let a = self.regs[self.next_8b_reg() as usize];
                 let b = self.regs[self.next_8b_reg() as usize];
                 self.bool_flag = a != b;
-                self.discard_8b(); // discard 8b
+                self.discard_8b();
             }
             Opcode::GT => {
                 let a = self.regs[self.next_8b_reg() as usize];
                 let b = self.regs[self.next_8b_reg() as usize];
                 self.bool_flag = a > b;
-                self.discard_8b(); // discard 8b
+                self.discard_8b();
             }
             Opcode::GEQ => {
                 let a = self.regs[self.next_8b_reg() as usize];
                 let b = self.regs[self.next_8b_reg() as usize];
                 self.bool_flag = a >= b;
-                self.discard_8b(); // discard 8b
+                self.discard_8b();
             }
             Opcode::LT => {
                 let a = self.regs[self.next_8b_reg() as usize];
                 let b = self.regs[self.next_8b_reg() as usize];
                 self.bool_flag = a < b;
-                self.discard_8b(); // discard 8b
+                self.discard_8b();
             }
             Opcode::LEQ => {
                 let a = self.regs[self.next_8b_reg() as usize];
                 let b = self.regs[self.next_8b_reg() as usize];
                 self.bool_flag = a <= b;
-                self.discard_8b(); // discard 8b
+                self.discard_8b();
             }
             Opcode::JEQ => {
                 let t = self.regs[self.next_8b_reg() as usize];

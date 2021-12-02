@@ -1,5 +1,7 @@
 use crate::asm::parser_program::*;
 use crate::asm::Assembler;
+use crate::asm::PIE_HEADER_LENGTH;
+use crate::asm::PIE_HEADER_PREFIX;
 use crate::vm;
 use std;
 use std::io;
@@ -21,8 +23,16 @@ impl REPL {
         }
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self, prog_bytes: Option<Vec<u8>>) {
         println!("REPL version 0.1");
+        if let Some(mut bytes) = prog_bytes {
+            if !self.verify_header(&bytes) {
+                println!("Wrong file or missing magic bytes");
+            } else {
+                let bytes = &bytes[PIE_HEADER_LENGTH..];
+                self.vm.program.extend_from_slice(&bytes);
+            }
+        }
         loop {
             let mut input = String::new();
             let stdin = io::stdin();
@@ -102,28 +112,40 @@ impl REPL {
                     }
                     println!("Loading {}", args[0]);
                     match std::fs::read(args[0]) {
-                        Ok(data) => match program(std::str::from_utf8(&data).unwrap()) {
-                            Ok((_rest, prog)) => {
-                                self.vm
-                                    .program
-                                    .append(&mut prog.to_bytes(&self.asm.symbols));
-                                println!("Parsed.");
+                        Ok(data) => {
+                            if !self.verify_header(&data) {
+                                println!("Wrong file or missing magic bytes");
+                                continue;
                             }
-                            Err(e) => {
-                                println!("Cannot parse file, {}", e);
+                            let data = &data[PIE_HEADER_LENGTH..];
+                            match program(std::str::from_utf8(&data).unwrap()) {
+                                Ok((_rest, prog)) => {
+                                    self.vm
+                                        .program
+                                        .append(&mut prog.to_bytes(&self.asm.symbols));
+                                    println!("Parsed.");
+                                }
+                                Err(e) => {
+                                    println!("Cannot parse file, {}", e);
+                                }
                             }
-                        },
+                        }
                         Err(e) => {
                             println!("Error reading the file: {}", e);
                         }
                     }
                 }
                 _ => {
-                    println!("Invalid input. Try the .help command")
+                    println!("Invalid input <{}>. Try the .help command", input)
                 }
             }
             self.cmd.push(input.to_string());
         }
+    }
+
+    fn verify_header(&self, bytes: &Vec<u8>) -> bool {
+        bytes.len() > PIE_HEADER_PREFIX.len()
+            && bytes[0..PIE_HEADER_PREFIX.len()] == PIE_HEADER_PREFIX
     }
 
     fn parse_hex(&mut self, i: &str) -> Result<Vec<u8>, ParseIntError> {
