@@ -1,4 +1,5 @@
 use crate::asm::parser_program::*;
+use crate::asm::Assembler;
 use crate::vm;
 use std;
 use std::io;
@@ -8,6 +9,7 @@ use std::num::ParseIntError;
 pub struct REPL {
     cmd: Vec<String>,
     vm: vm::VM,
+    asm: Assembler,
 }
 
 impl REPL {
@@ -15,6 +17,7 @@ impl REPL {
         REPL {
             vm: vm::VM::new(),
             cmd: vec![],
+            asm: Assembler::new(),
         }
     }
 
@@ -101,7 +104,9 @@ impl REPL {
                     match std::fs::read(args[0]) {
                         Ok(data) => match program(std::str::from_utf8(&data).unwrap()) {
                             Ok((_rest, prog)) => {
-                                self.vm.program.append(&mut prog.to_bytes());
+                                self.vm
+                                    .program
+                                    .append(&mut prog.to_bytes(&self.asm.symbols));
                                 println!("Parsed.");
                             }
                             Err(e) => {

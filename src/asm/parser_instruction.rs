@@ -8,6 +8,7 @@ use crate::asm::parser_label::{label_declaration, label_usage};
 use crate::asm::parser_op::*;
 use crate::asm::parser_operand::{integer_operand, operand};
 use crate::asm::parser_reg::register;
+use crate::asm::SymbolTable;
 use crate::asm::Token;
 
 #[derive(Debug, PartialEq)]
@@ -21,7 +22,7 @@ pub struct AssemblerInstruction {
 }
 
 impl AssemblerInstruction {
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self, st: &SymbolTable) -> Vec<u8> {
         let mut res = vec![];
         match self.opcode {
             Some(Token::Op { code }) => res.push(code as u8),
@@ -56,6 +57,13 @@ impl AssemblerInstruction {
                 println!("Non-operand found in operand field");
                 std::process::exit(1)
             }
+        }
+    }
+
+    pub fn label_name(&self) -> Option<String> {
+        match &self.label {
+            Some(Token::LabelDeclaration { name }) => Some(name.clone()),
+            _ => None,
         }
     }
 }

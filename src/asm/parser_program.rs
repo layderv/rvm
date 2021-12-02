@@ -1,16 +1,17 @@
 use crate::asm::parser_instruction::*;
+use crate::asm::SymbolTable;
 use nom::{multi::many1, IResult};
 
 #[derive(Debug, PartialEq)]
 pub struct Program {
-    instructions: Vec<AssemblerInstruction>,
+    pub instructions: Vec<AssemblerInstruction>,
 }
 
 impl Program {
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self, st: &SymbolTable) -> Vec<u8> {
         let mut prog = vec![];
         for i in &self.instructions {
-            prog.append(&mut i.to_bytes())
+            prog.append(&mut i.to_bytes(st))
         }
         return prog;
     }
@@ -75,11 +76,12 @@ mod tests {
     }
     #[test]
     fn test_program_to_bytes() {
+        let st = SymbolTable::new();
         let prog = program("load $2 #100\n").unwrap().1;
-        assert_eq!(prog.to_bytes().len(), 4);
-        assert_eq!(prog.to_bytes()[0], Opcode::LOAD as u8);
-        assert_eq!(prog.to_bytes()[1], 02u8);
-        assert_eq!(prog.to_bytes()[2], 0);
-        assert_eq!(prog.to_bytes()[3], 100u8);
+        assert_eq!(prog.to_bytes(&st).len(), 4);
+        assert_eq!(prog.to_bytes(&st)[0], Opcode::LOAD as u8);
+        assert_eq!(prog.to_bytes(&st)[1], 02u8);
+        assert_eq!(prog.to_bytes(&st)[2], 0);
+        assert_eq!(prog.to_bytes(&st)[3], 100u8);
     }
 }
