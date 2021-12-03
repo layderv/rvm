@@ -23,6 +23,7 @@ pub enum Opcode {
     JEQ,
     JNE,
     ALOC,
+    PRTS, // print string
     IGL,
 }
 
@@ -61,6 +62,7 @@ impl From<&str> for Opcode {
             "jeq" => Opcode::JEQ,
             "jne" => Opcode::JNE,
             "aloc" => Opcode::ALOC,
+            "prts" => Opcode::PRTS,
             _ => Opcode::IGL,
         }
     }
@@ -96,6 +98,7 @@ impl From<u8> for Opcode {
             x if x == Opcode::JEQ as u8 => Opcode::JEQ,
             x if x == Opcode::JNE as u8 => Opcode::JNE,
             x if x == Opcode::ALOC as u8 => Opcode::ALOC,
+            x if x == Opcode::PRTS as u8 => Opcode::PRTS,
             _ => Opcode::IGL,
         }
     }

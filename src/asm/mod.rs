@@ -9,6 +9,8 @@ pub mod parser_reg;
 
 use crate::asm::parser_program::{program, Program};
 
+use self::parser_instruction::AssemblerInstruction;
+
 pub const PIE_HEADER_PREFIX: [u8; 4] = [0x7e, 'P' as u8, 'I' as u8, 'E' as u8];
 pub const PIE_HEADER_LENGTH: usize = 64;
 
@@ -20,12 +22,34 @@ pub enum Token {
     LabelDeclaration { name: String },
     LabelUsage { name: String },
     Directive { name: String },
+    String { name: String },
 }
 
 #[derive(Debug)]
 pub struct Assembler {
     pub phase: AssemblerPhase,
     pub symbols: SymbolTable,
+    pub ro: Vec<u8>,       // read-only data section for constants
+    pub bytecode: Vec<u8>, // compiled bytecode
+
+    sections: Vec<AssemblerSection>,
+    current_section: Option<AssemblerSection>,
+    current_instruction: usize,
+    errors: Vec<AssemblerError>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AssemblerSection {
+    Data,
+    Code,
+}
+
+#[derive(Debug, Clone)]
+pub enum AssemblerError {
+    ParseError(String),
+    NoSegmentFor(usize, String),     // where, what
+    SymbolRedeclared(usize, String), // where, what
+    UnknownDirective(usize, String), // where, what
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -56,52 +80,105 @@ impl Assembler {
         Assembler {
             phase: AssemblerPhase::First,
             symbols: SymbolTable::new(),
+            ro: vec![],
+            bytecode: vec![],
+            sections: vec![],
+            current_section: None,
+            current_instruction: 0,
+            errors: vec![],
         }
     }
 
-    pub fn assemble(&mut self, raw: &str) -> Option<Vec<u8>> {
+    pub fn assemble(&mut self, raw: &str) -> Result<Vec<u8>, Vec<AssemblerError>> {
         match program(raw) {
             Ok((_rest, prog)) => {
                 let mut program = self.write_pie_header();
                 self.process_first_phase(&prog);
-                let mut body = self.process_second_phase(&prog);
-                program.append(&mut body);
-                Some(program)
+                if self.errors.is_empty() && self.sections.contains(&AssemblerSection::Code) {
+                    let mut body = self.process_second_phase(&prog);
+                    program.append(&mut body);
+                    Ok(program)
+                } else {
+                    Err(self.errors.clone())
+                }
             }
             Err(e) => {
                 println!("Error assembling: {}", e);
-                None
+                Err(vec![AssemblerError::ParseError(e.to_string())])
             }
         }
     }
 
     fn process_first_phase(&mut self, p: &Program) {
-        self.extract_labels(p);
+        for (idx, i) in p.instructions.iter().enumerate() {
+            if let Some(label) = i.label_name() {
+                match self.current_section {
+                    None => self
+                        .errors
+                        .push(AssemblerError::NoSegmentFor(idx * 4, label)),
+                    _ => {
+                        // label: .directive operands
+                        if self.symbols.has_symbol(&label) {
+                            self.errors
+                                .push(AssemblerError::SymbolRedeclared(idx, label))
+                        } else {
+                            self.symbols.add_symbol(Symbol::new(
+                                label,
+                                SymbolType::Label,
+                                idx as u32 * 4,
+                            ))
+                        }
+                    }
+                }
+            }
+            match i.directive_name() {
+                Some(directive) if i.operand1.is_some() && i.label_name().is_some() => {
+                    match directive.as_str() {
+                        "asciiz" => self.do_asciiz(&i),
+                        _ => self
+                            .errors
+                            .push(AssemblerError::UnknownDirective(idx * 4, directive)),
+                    }
+                }
+                Some(directive) if i.operand1.is_none() => match directive.as_str() {
+                    "code" => {
+                        self.sections.push(AssemblerSection::Code);
+                        self.current_section = Some(AssemblerSection::Code)
+                    }
+                    "data" => {
+                        self.sections.push(AssemblerSection::Data);
+                        self.current_section = Some(AssemblerSection::Data)
+                    }
+                    _ => self
+                        .errors
+                        .push(AssemblerError::UnknownDirective(idx * 4, directive)),
+                },
+                _ => {}
+            }
+        }
         self.phase = AssemblerPhase::Second;
     }
 
     fn process_second_phase(&mut self, p: &Program) -> Vec<u8> {
         let mut prog = vec![];
         for i in &p.instructions {
-            let mut bytes = i.to_bytes(&self.symbols);
-            prog.append(&mut bytes);
+            if let Some(Token::Op { code }) = i.opcode {
+                let mut bytes = i.to_bytes(&self.symbols);
+                prog.append(&mut bytes);
+            }
         }
         prog
     }
 
-    fn extract_labels(&mut self, p: &Program) {
-        for (idx, i) in p.instructions.iter().enumerate() {
-            match i.label_name() {
-                Some(name) => {
-                    let sym = Symbol::new(
-                        name,
-                        SymbolType::Label,
-                        idx as u32 * 4, /* 4B per instr */
-                    );
-                    self.symbols.add_symbol(sym);
-                }
-                None => {}
-            }
+    fn do_asciiz(&mut self, i: &AssemblerInstruction) {
+        // checked by the caller: this is in a label and operand1.is_some()
+        if self.phase != AssemblerPhase::First {
+            return;
+        }
+        if let Some(Token::String { name }) = &i.operand1 {
+            self.symbols.set_symbol_offset(&name, self.ro.len() as u32);
+            name.as_bytes().iter().for_each(|b| self.ro.push(*b));
+            self.ro.push(0);
         }
     }
 
@@ -134,6 +211,11 @@ impl SymbolTable {
         self.symbols.push(s);
     }
 
+    pub fn has_symbol(&self, name: &String) -> bool {
+        self.symbols.iter().any(|el| el.name == *name)
+    }
+
+    /// returns the offset of the symbol in input
     pub fn symbol_value(&self, s: &str) -> Option<u32> {
         for sym in &self.symbols {
             if sym.name == s {
@@ -141,6 +223,14 @@ impl SymbolTable {
             }
         }
         None
+    }
+
+    pub fn set_symbol_offset(&mut self, s: &String, offset: u32) {
+        for sym in &mut self.symbols {
+            if sym.name == *s {
+                sym.offset = offset;
+            }
+        }
     }
 }
 
@@ -180,5 +270,22 @@ mod tests {
                 0,
             ]
         );
+    }
+
+    #[test]
+    fn test_ro_data() {
+        let mut asm = Assembler::new();
+        let prog = asm
+            .assemble(
+                ".data
+            str: .asciiz 'Test String'
+            .code
+            hlt
+            ",
+            )
+            .unwrap();
+        assert_eq!(asm.symbols.has_symbol(&String::from("str")), true);
+        assert_eq!(asm.symbols.symbol_value("str").unwrap(), 4);
+        assert_eq!(asm.ro, "Test String\0".as_bytes());
     }
 }

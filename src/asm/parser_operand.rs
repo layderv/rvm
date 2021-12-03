@@ -1,3 +1,4 @@
+use nom::bytes::complete::take_until;
 use nom::{
     branch::alt, bytes::complete::tag, character::complete::digit1,
     character::complete::multispace0, sequence::terminated, IResult,
@@ -5,6 +6,8 @@ use nom::{
 
 use crate::asm::parser_reg::register;
 use crate::asm::Token;
+
+use super::parser_label::label_usage;
 
 /* recognize: #n where n is i32 with 0+ spaces around */
 pub fn integer_operand(input: &str) -> IResult<&str, Token> {
@@ -19,8 +22,21 @@ pub fn integer_operand(input: &str) -> IResult<&str, Token> {
     ))
 }
 
+pub fn string_operand(input: &str) -> IResult<&str, Token> {
+    let input = input.trim();
+    let (input, _) = tag("'")(input)?;
+    let (input, s) = take_until("'")(input)?;
+    let (input, _) = tag("'")(input)?;
+    Ok((
+        input,
+        Token::String {
+            name: s.to_string(),
+        },
+    ))
+}
+
 pub fn operand(input: &str) -> IResult<&str, Token> {
-    alt((integer_operand, register))(input)
+    alt((integer_operand, label_usage, register, string_operand))(input)
 }
 
 mod tests {
@@ -37,5 +53,17 @@ mod tests {
         );
         //assert_eq!(integer_operand("#1a").is_ok(), false);
         assert_eq!(integer_operand("1").is_ok(), false);
+    }
+    #[test]
+    fn test_parse_string_operand() {
+        assert_eq!(
+            string_operand("'hi'").unwrap(),
+            (
+                "",
+                Token::String {
+                    name: "hi".to_string()
+                }
+            )
+        );
     }
 }

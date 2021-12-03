@@ -7,6 +7,7 @@ pub struct VM {
     pub heap: Vec<u8>,
     pub remainder: u32,
     pub bool_flag: bool, // equality flag
+    pub ro_data: Vec<u8>,
 }
 
 impl VM {
@@ -18,6 +19,7 @@ impl VM {
             heap: vec![],
             remainder: 0,
             bool_flag: false,
+            ro_data: vec![],
         }
     }
 
@@ -142,6 +144,17 @@ impl VM {
                 let t = self.regs[self.next_8b_reg() as usize];
                 let new_end = self.heap.len() as i32 + t;
                 self.heap.resize(new_end as usize, 0);
+            }
+            Opcode::PRTS => {
+                let offs = self.next_16b() as usize;
+                let v: Vec<u8> = self
+                    .ro_data
+                    .iter()
+                    .take_while(|&&b| b != 0)
+                    .cloned()
+                    .collect();
+                let s = std::str::from_utf8(&v).unwrap();
+                println!("{}", s);
             }
             op => {
                 println!("Unrecognized opcode: {:?}", op);

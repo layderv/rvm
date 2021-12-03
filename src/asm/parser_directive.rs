@@ -1,3 +1,4 @@
+use nom::combinator::opt;
 use nom::{
     branch::alt, bytes::complete::tag, character::complete::alpha1, character::complete::space0,
     sequence::terminated, sequence::tuple, IResult,
@@ -6,6 +7,8 @@ use nom::{
 use crate::asm::parser_instruction::*;
 use crate::asm::parser_operand::operand;
 use crate::asm::Token;
+
+use super::parser_label::label_declaration;
 
 pub fn directive_declaration(input: &str) -> IResult<&str, Token> {
     let (input, _) = tag(".")(input)?;
@@ -19,16 +22,18 @@ pub fn directive_declaration(input: &str) -> IResult<&str, Token> {
 }
 
 pub fn directive_all(input: &str) -> IResult<&str, AssemblerInstruction> {
-    let (input, (_, _, name, _, operand1, _, operand2, _, operand3, _)) = tuple((
-        tag("."),
+    let input = input.trim();
+    let (input, (_, label, _, name, _, operand1, _, operand2, _, operand3, _)) = tuple((
+        space0,
+        opt(label_declaration),
         space0,
         directive_declaration,
         space0,
-        operand,
+        opt(operand),
         space0,
-        operand,
+        opt(operand),
         space0,
-        operand,
+        opt(operand),
         space0,
     ))(input)?;
     Ok((
@@ -36,10 +41,10 @@ pub fn directive_all(input: &str) -> IResult<&str, AssemblerInstruction> {
         AssemblerInstruction {
             opcode: None,
             directive: Some(name),
-            label: None,
-            operand1: Some(operand1),
-            operand2: Some(operand2),
-            operand3: Some(operand3),
+            label: label,
+            operand1: operand1,
+            operand2: operand2,
+            operand3: operand3,
         },
     ))
 }
@@ -47,4 +52,31 @@ pub fn directive_all(input: &str) -> IResult<&str, AssemblerInstruction> {
 pub fn directive(input: &str) -> IResult<&str, AssemblerInstruction> {
     //alt((directive_all))(input)
     directive_all(input)
+}
+
+mod tests {
+    use super::*;
+    #[test]
+    fn test_string_directive() {
+        assert_eq!(
+            directive_all("test: .asciiz 'Hi'"),
+            Ok((
+                "",
+                AssemblerInstruction {
+                    opcode: None,
+                    label: Some(Token::LabelDeclaration {
+                        name: "test".to_string()
+                    }),
+                    directive: Some(Token::Directive {
+                        name: "asciiz".to_string()
+                    }),
+                    operand1: Some(Token::String {
+                        name: "Hi".to_string()
+                    }),
+                    operand2: None,
+                    operand3: None,
+                }
+            ))
+        );
+    }
 }

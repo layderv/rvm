@@ -25,12 +25,22 @@ impl REPL {
 
     pub fn run(&mut self, prog_bytes: Option<Vec<u8>>) {
         println!("REPL version 0.1");
-        if let Some(mut bytes) = prog_bytes {
+        if let Some(bytes) = prog_bytes {
             if !self.verify_header(&bytes) {
                 println!("Wrong file or missing magic bytes");
             } else {
                 let bytes = &bytes[PIE_HEADER_LENGTH..];
-                self.vm.program.extend_from_slice(&bytes);
+                match self.asm.assemble(std::str::from_utf8(&bytes).unwrap()) {
+                    Ok(mut prog) => {
+                        self.vm.program.append(&mut prog);
+                        self.vm.pc = PIE_HEADER_LENGTH as usize;
+                        self.vm.ro_data = self.asm.ro.clone();
+                        println!("Parsed.");
+                    }
+                    Err(e) => {
+                        println!("Cannot parse file, {:#?}", e);
+                    }
+                }
             }
         }
         loop {
@@ -60,6 +70,7 @@ impl REPL {
                         ".run",
                         ".step",
                         ".clear_program",
+                        ".ro_data",
                         ".load_file FILE",
                     ] {
                         println!("\t{}", cmd);
@@ -104,6 +115,7 @@ impl REPL {
                     self.vm.run();
                     ()
                 }
+                ".ro_data" => println!("Read-Only data: {:?}", self.vm.ro_data),
                 ".clear_program" => self.vm.program.clear(),
                 ".load_file" => {
                     if args.len() == 0 {
@@ -118,15 +130,13 @@ impl REPL {
                                 continue;
                             }
                             let data = &data[PIE_HEADER_LENGTH..];
-                            match program(std::str::from_utf8(&data).unwrap()) {
-                                Ok((_rest, prog)) => {
-                                    self.vm
-                                        .program
-                                        .append(&mut prog.to_bytes(&self.asm.symbols));
+                            match self.asm.assemble(std::str::from_utf8(&data).unwrap()) {
+                                Ok(mut prog) => {
+                                    self.vm.program.append(&mut prog);
                                     println!("Parsed.");
                                 }
                                 Err(e) => {
-                                    println!("Cannot parse file, {}", e);
+                                    println!("Cannot parse file, {:#?}", e);
                                 }
                             }
                         }

@@ -84,4 +84,20 @@ mod tests {
         assert_eq!(prog.to_bytes(&st)[2], 0);
         assert_eq!(prog.to_bytes(&st)[3], 100u8);
     }
+    #[test]
+    fn test_program() {
+        let prog = program(
+            "
+            .data
+        str: .asciiz 'Hi'
+        .code
+        load $1 #100
+        hlt
+        "
+            .trim(),
+        )
+        .unwrap()
+        .1;
+        println!("{:#?}", prog);
+    }
 }
