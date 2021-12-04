@@ -147,8 +147,7 @@ impl VM {
             }
             Opcode::PRTS => {
                 let offs = self.next_16b() as usize;
-                let v: Vec<u8> = self
-                    .ro_data
+                let v: Vec<u8> = self.ro_data[offs..]
                     .iter()
                     .take_while(|&&b| b != 0)
                     .cloned()

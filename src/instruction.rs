@@ -32,12 +32,6 @@ pub struct Instruction {
     opcode: Opcode,
 }
 
-impl fmt::Display for Opcode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
 impl From<&str> for Opcode {
     fn from(v: &str) -> Self {
         match v.to_lowercase().as_str() {
@@ -101,6 +95,12 @@ impl From<u8> for Opcode {
             x if x == Opcode::PRTS as u8 => Opcode::PRTS,
             _ => Opcode::IGL,
         }
+    }
+}
+
+impl fmt::Display for Opcode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 

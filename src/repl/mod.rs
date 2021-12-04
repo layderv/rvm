@@ -53,11 +53,11 @@ impl REPL {
             let buf: Vec<&str> = input.split(" ").collect();
             let cmd = buf.first();
             if let None = cmd {
-                println!("No command");
                 continue;
             }
             let (cmd, args) = buf.split_at(1);
             match cmd.join("").as_str() {
+                "" => continue,
                 ".help" => {
                     println!("Commands:");
                     for cmd in vec![
@@ -84,8 +84,19 @@ impl REPL {
                 }
                 ".program" => {
                     println!("Loaded program:");
-                    for i in &self.vm.program {
-                        println!("{:x}", i);
+                    for (idx, i) in self.vm.program[PIE_HEADER_LENGTH..].iter().enumerate() {
+                        if (idx % 4) == 0 {
+                            let op: Opcode = (*i).into();
+                            match op {
+                                Opcode::IGL => print!("{:x} ", i),
+                                _ => print!("{}", op.to_string()),
+                            }
+                        } else {
+                            print!("{:x} ", i);
+                        }
+                        if idx > 0 && (idx % 4) == 3 {
+                            println!()
+                        }
                     }
                 }
                 ".registers" => {

@@ -125,7 +125,7 @@ impl Assembler {
                             self.symbols.add_symbol(Symbol::new(
                                 label,
                                 SymbolType::Label,
-                                idx as u32 * 4,
+                                0, // will be set later
                             ))
                         }
                     }
@@ -176,7 +176,8 @@ impl Assembler {
             return;
         }
         if let Some(Token::String { name }) = &i.operand1 {
-            self.symbols.set_symbol_offset(&name, self.ro.len() as u32);
+            self.symbols
+                .set_symbol_offset(&i.label_name().unwrap(), self.ro.len() as u32);
             name.as_bytes().iter().for_each(|b| self.ro.push(*b));
             self.ro.push(0);
         }
@@ -247,7 +248,12 @@ mod tests {
     #[test]
     fn test_assemble_program() {
         let mut asm = Assembler::new();
-        let code = "load $0 #100\nload $1 #99\nlab:inc $0\njmp @test\nhlt";
+        let code = ".data 
+        test: .asciiz 'hi' 
+        .code load $0 #100
+        load $1 #99
+        lab:inc $0
+        prts @test";
         let program: Vec<u8> = asm.assemble(code).unwrap();
         assert_eq!(
             program[PIE_HEADER_LENGTH..], // TODO check header
@@ -264,7 +270,7 @@ mod tests {
                 0,
                 0,
                 0,
-                Opcode::JMP as u8,
+                Opcode::PRTS as u8,
                 0,
                 0,
                 0,
@@ -285,7 +291,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(asm.symbols.has_symbol(&String::from("str")), true);
-        assert_eq!(asm.symbols.symbol_value("str").unwrap(), 4);
+        assert_eq!(asm.symbols.symbol_value("str").unwrap(), 0);
         assert_eq!(asm.ro, "Test String\0".as_bytes());
     }
 }
