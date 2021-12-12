@@ -2,12 +2,13 @@
 pub mod asm;
 pub mod instruction;
 pub mod repl;
+pub mod sched;
 pub mod vm;
 
 extern crate clap;
 extern crate nom;
 
-use clap::{load_yaml, App, Arg, SubCommand};
+use clap::{load_yaml, App};
 
 fn main() {
     let mut repl = repl::REPL::new();

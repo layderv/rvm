@@ -1,5 +1,9 @@
+use chrono::{DateTime, Utc};
+use uuid;
+
 use crate::instruction::Opcode;
 
+#[derive(Clone)]
 pub struct VM {
     pub regs: [i32; 32],
     pub pc: usize,
@@ -8,6 +12,23 @@ pub struct VM {
     pub remainder: u32,
     pub bool_flag: bool, // equality flag
     pub ro_data: Vec<u8>,
+    pub id: uuid::Uuid,
+
+    events: Vec<VMEvent>,
+}
+
+#[derive(Clone, Debug)]
+pub enum VMEventType {
+    Start,
+    Stop,
+    Crash,
+}
+
+#[derive(Clone, Debug)]
+pub struct VMEvent {
+    event: VMEventType,
+    at: DateTime<Utc>,
+    vm_id: uuid::Uuid,
 }
 
 impl VM {
@@ -20,14 +41,27 @@ impl VM {
             remainder: 0,
             bool_flag: false,
             ro_data: vec![],
+            id: uuid::Uuid::new_v4(),
+            events: vec![],
         }
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> bool {
         let mut done = false;
+        self.events.push(VMEvent {
+            event: VMEventType::Start,
+            at: Utc::now(),
+            vm_id: self.id,
+        });
         while !done {
             done = self.step();
         }
+        self.events.push(VMEvent {
+            event: VMEventType::Stop,
+            at: Utc::now(),
+            vm_id: self.id,
+        });
+        done
     }
 
     pub fn step(&mut self) -> bool {
@@ -41,9 +75,17 @@ impl VM {
                 return true;
             }
             Opcode::LOAD => {
+                // format: opcode dst_reg const_num
                 let reg = self.next_8b() as usize;
                 let n = self.next_16b() as u16;
                 self.regs[reg] = n as i32;
+            }
+            Opcode::MOV => {
+                // format: opcode dst_reg src_reg
+                let dst = self.next_8b() as usize;
+                let src = self.next_8b() as usize;
+                self.regs[dst] = self.regs[src];
+                self.discard_8b();
             }
             Opcode::ADD => {
                 let p = self.regs[self.next_8b_reg() as usize];
@@ -66,13 +108,20 @@ impl VM {
                 self.regs[self.next_8b_reg() as usize] = p / q;
                 self.remainder = (p % q) as u32;
             }
+            Opcode::NEG => {
+                let r = self.next_8b_reg() as usize;
+                self.regs[r] = self.regs[r].wrapping_mul(-1);
+                self.discard_16b();
+            }
             Opcode::INC => {
                 let r = self.next_8b_reg() as usize;
                 self.regs[r] = self.regs[r].wrapping_add(1);
+                self.discard_16b();
             }
             Opcode::DEC => {
                 let r = self.next_8b_reg() as usize;
                 self.regs[r] = self.regs[r].wrapping_sub(1);
+                self.discard_16b();
             }
             Opcode::JMP => {
                 let t = self.regs[self.next_8b_reg() as usize];
@@ -128,6 +177,21 @@ impl VM {
                 self.bool_flag = a <= b;
                 self.discard_8b();
             }
+            Opcode::OR => {
+                let p = self.regs[self.next_8b_reg() as usize];
+                let q = self.regs[self.next_8b_reg() as usize];
+                self.regs[self.next_8b_reg() as usize] = p | q;
+            }
+            Opcode::AND => {
+                let p = self.regs[self.next_8b_reg() as usize];
+                let q = self.regs[self.next_8b_reg() as usize];
+                self.regs[self.next_8b_reg() as usize] = p & q;
+            }
+            Opcode::NOT => {
+                let r = self.next_8b_reg() as usize;
+                self.regs[r] = !r as i32;
+                self.discard_16b();
+            }
             Opcode::JEQ => {
                 let t = self.regs[self.next_8b_reg() as usize];
                 if self.bool_flag {
@@ -144,6 +208,7 @@ impl VM {
                 let t = self.regs[self.next_8b_reg() as usize];
                 let new_end = self.heap.len() as i32 + t;
                 self.heap.resize(new_end as usize, 0);
+                self.discard_16b();
             }
             Opcode::PRTS => {
                 let offs = self.next_16b() as usize;
@@ -154,6 +219,7 @@ impl VM {
                     .collect();
                 let s = std::str::from_utf8(&v).unwrap();
                 println!("{}", s);
+                self.discard_8b();
             }
             op => {
                 println!("Unrecognized opcode: {:?}", op);
@@ -171,6 +237,10 @@ impl VM {
 
     fn discard_8b(&mut self) {
         self.pc += 1;
+    }
+
+    fn discard_16b(&mut self) {
+        self.pc += 2;
     }
 
     fn next_8b(&mut self) -> u8 {

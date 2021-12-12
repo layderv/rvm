@@ -2,16 +2,20 @@ use crate::asm::parser_program::*;
 use crate::asm::Assembler;
 use crate::asm::PIE_HEADER_LENGTH;
 use crate::asm::PIE_HEADER_PREFIX;
+use crate::instruction::Opcode;
+use crate::sched::Scheduler;
 use crate::vm;
 use std;
 use std::io;
 use std::io::Write;
 use std::num::ParseIntError;
+use std::thread::JoinHandle;
 
 pub struct REPL {
     cmd: Vec<String>,
     vm: vm::VM,
     asm: Assembler,
+    sched: Scheduler,
 }
 
 impl REPL {
@@ -20,6 +24,7 @@ impl REPL {
             vm: vm::VM::new(),
             cmd: vec![],
             asm: Assembler::new(),
+            sched: Scheduler::new(),
         }
     }
 
@@ -43,6 +48,8 @@ impl REPL {
                 }
             }
         }
+
+        let mut thread_vm: Option<JoinHandle<vm::VM>> = None;
         loop {
             let mut input = String::new();
             let stdin = io::stdin();
@@ -89,7 +96,7 @@ impl REPL {
                             let op: Opcode = (*i).into();
                             match op {
                                 Opcode::IGL => print!("{:x} ", i),
-                                _ => print!("{}", op.to_string()),
+                                _ => print!("{} ", op.to_string()),
                             }
                         } else {
                             print!("{:x} ", i);
@@ -101,18 +108,22 @@ impl REPL {
                 }
                 ".registers" => {
                     println!("Registers:");
-                    for (i, reg) in self.vm.regs.iter().enumerate() {
-                        print!("reg{:02}: {}\t", i, reg);
-                        if i > 0 && (i % 4) == 3 {
-                            println!()
+                    match thread_vm.take() {
+                        Some(vm_handle) => {
+                            let vm = vm_handle.join();
+                            let vm = vm.unwrap();
+                            for (i, reg) in vm.regs.iter().enumerate() {
+                                print!("reg{:02}: {}\t", i, reg);
+                                if i > 0 && (i % 4) == 3 {
+                                    println!()
+                                }
+                            }
+                            println!();
+                            println!("remainder:{}\nflag:{}", vm.remainder, vm.bool_flag);
+                            println!("pc:{}", vm.pc);
                         }
+                        None => todo!(),
                     }
-                    println!();
-                    println!(
-                        "remainder:{}\nflag:{}",
-                        self.vm.remainder, self.vm.bool_flag
-                    );
-                    println!("pc:{}", self.vm.pc);
                 }
                 ".instruct" => match self.parse_hex(&args.join(" ")) {
                     Ok(mut bytes) => self.vm.program.append(&mut bytes),
@@ -123,7 +134,7 @@ impl REPL {
                     ()
                 }
                 ".run" => {
-                    self.vm.run();
+                    thread_vm = Some(self.sched.get_thread(self.vm.clone()));
                     ()
                 }
                 ".ro_data" => println!("Read-Only data: {:?}", self.vm.ro_data),
